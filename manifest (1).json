@@ -1,0 +1,13 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "FactOrial",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "FactO",
+  "start_url": "/",
+  "theme_color": "#000000",
+  "description": "facts scrolling app",
+  "lang": "en"
+}
