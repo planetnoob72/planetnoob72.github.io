@@ -1,0 +1,19 @@
+{
+  "name": "Stacks — a fact feed",
+  "short_name": "Stacks",
+  "description": "Replace doomscrolling with random facts from Wikipedia. Light and dark modes, searchable topics, auto-scroll.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F1ECDD",
+  "theme_color": "#B5842A",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

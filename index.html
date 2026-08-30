@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Stacks — a fact feed</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{ --outer-bg:#0E0E0E; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{ background:var(--outer-bg); font-family:'IBM Plex Sans', sans-serif; overflow:hidden; }
+
+  #app{
+    --paper:#F1ECDD; --paper-alt:#E7DFC7; --ink:#1B2A2F; --ink-soft:#4B5A57;
+    --stamp:#B5842A; --stamp-soft:#DCC08C; --sage:#5B7065; --card-border:#C9BFA0; --error:#8A3B2E;
+    position:relative; width:100%; height:100vh; height:100dvh; max-width:520px; margin:0 auto;
+    background:var(--paper); overflow:hidden; box-shadow:0 0 60px rgba(0,0,0,0.4); color:var(--ink);
+  }
+  #app.theme-night{ --paper:#14181A; --paper-alt:#1B2124; --ink:#EDE6D6; --ink-soft:#9FAAA4; --stamp:#4FB0A5; --stamp-soft:#28403C; --sage:#C97B63; --card-border:#2B3235; --error:#E08677; }
+
+  /* ---------- top bar ---------- */
+  #topbar{ position:absolute; top:0; left:0; right:0; z-index:30; padding:12px 14px 8px;
+    background:linear-gradient(to bottom, var(--paper) 55%, transparent); pointer-events:none; }
+  #topbar > *{ pointer-events:auto; }
+  .brand-name{ font-family:'Fraunces', serif; font-weight:600; font-size:20px; letter-spacing:0.01em; margin-bottom:8px; }
+  .toolbar{ display:flex; gap:7px; margin-bottom:8px; }
+  .icon-btn{ flex:0 0 auto; font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:0.03em; text-transform:uppercase;
+    padding:7px 12px; border:1px solid var(--card-border); border-radius:999px; background:var(--paper-alt);
+    color:var(--ink-soft); cursor:pointer; user-select:none; white-space:nowrap; transition:all 0.15s; }
+  .icon-btn.active{ background:var(--stamp); color:var(--paper); border-color:var(--stamp); }
+
+  .search-row{ display:none; gap:8px; margin-bottom:8px; }
+  .search-row.open{ display:flex; }
+  .search-row input{ flex:1; font-family:'IBM Plex Mono', monospace; font-size:12px; padding:8px 12px;
+    border-radius:999px; border:1px solid var(--card-border); background:var(--paper-alt); color:var(--ink); outline:none; }
+  .search-row input::placeholder{ color:var(--ink-soft); }
+
+  #chips{ display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+  #chips::-webkit-scrollbar{ display:none; }
+  .chip{ flex:0 0 auto; font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.04em;
+    text-transform:uppercase; padding:7px 13px; border:1px solid var(--card-border); border-radius:999px;
+    background:var(--paper-alt); color:var(--ink-soft); cursor:pointer; user-select:none;
+    transition:background 0.15s, color 0.15s, border-color 0.15s; white-space:nowrap; }
+  .chip.active{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
+  /* ---------- settings tab ---------- */
+  #settings-drawer{ position:absolute; top:0; right:0; bottom:0; left:0; z-index:40; background:rgba(0,0,0,0.45);
+    display:none; align-items:flex-end; }
+  #settings-drawer.open{ display:flex; }
+  .drawer-sheet{ background:var(--paper); width:100%; padding:20px 20px 28px; border-radius:18px 18px 0 0;
+    border-top:1px solid var(--card-border); }
+  .drawer-title{ font-family:'Fraunces', serif; font-size:17px; font-weight:600; margin-bottom:16px; }
+  .setting-row{ display:flex; justify-content:space-between; align-items:center; padding:14px 0;
+    border-bottom:1px solid var(--card-border); }
+  .setting-row:last-of-type{ border-bottom:none; }
+  .setting-label{ font-family:'IBM Plex Sans', sans-serif; font-size:14px; font-weight:500; }
+  .setting-sub{ font-family:'IBM Plex Mono', monospace; font-size:10px; color:var(--ink-soft); text-transform:uppercase;
+    letter-spacing:0.05em; margin-top:2px; }
+  .drawer-close{ margin-top:18px; width:100%; padding:10px; border-radius:10px; border:1px solid var(--card-border);
+    background:var(--paper-alt); color:var(--ink); font-family:'IBM Plex Mono', monospace; font-size:11px;
+    text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; }
+
+  /* ---------- feed ---------- */
+  #feed{ height:100%; overflow-y:scroll; scroll-snap-type:y mandatory; scrollbar-width:none; }
+  #feed::-webkit-scrollbar{ display:none; }
+
+  .card{ height:100%; width:100%; scroll-snap-align:start; scroll-snap-stop:always; position:relative;
+    display:flex; flex-direction:column; border-bottom:1px solid var(--card-border); }
+  .card:nth-child(odd){ background:var(--paper); }
+  .card:nth-child(even){ background:var(--paper-alt); }
+
+  /* postcard media: framed photo with margin + rounded corners */
+  .media{ height:32%; min-height:32%; position:relative; overflow:hidden; background:var(--stamp-soft);
+    margin:14px 14px 0; border-radius:10px; box-shadow:0 3px 10px rgba(0,0,0,0.15); }
+  .media img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .media .monogram{ width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces', serif; font-weight:600; font-size:74px; color:var(--stamp); opacity:0.55; }
+
+  .content{ flex:1; padding:16px 26px 20px; display:flex; flex-direction:column; overflow-y:auto; }
+  .meta-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .catalog-no{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); letter-spacing:0.03em; }
+  .stamp{ font-family:'IBM Plex Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--stamp); border:1.5px dashed var(--stamp); border-radius:3px; padding:4px 8px; transform:rotate(3deg);
+    background:rgba(0,0,0,0.02); }
+
+  .fact-title{ font-family:'Fraunces', serif; font-weight:600; font-size:22px; line-height:1.15; margin-bottom:10px; }
+  .fact-body{ font-family:'Fraunces', serif; font-style:italic; font-weight:400; font-size:16.5px; line-height:1.46; flex:1; }
+  .fact-source{ display:flex; justify-content:space-between; align-items:center; margin-top:12px;
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px; color:var(--sage); letter-spacing:0.03em; }
+  .fact-source a{ color:var(--sage); text-decoration:none; border-bottom:1px solid var(--sage); }
+
+  .error-card .fact-title{ color:var(--error); }
+</style>
+</head>
+<body>
+<div id="app" class="theme-catalog">
+  <div id="topbar">
+    <div class="brand-name">Stacks</div>
+    <div class="toolbar">
+      <div class="icon-btn" id="search-btn">Search</div>
+      <div class="icon-btn" id="settings-btn">Settings</div>
+    </div>
+    <div class="search-row" id="search-row">
+      <input id="search-input" placeholder="Search any topic…" />
+    </div>
+    <div id="chips"></div>
+  </div>
+  <div id="feed"></div>
+
+  <div id="settings-drawer">
+    <div class="drawer-sheet">
+      <div class="drawer-title">Settings</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Appearance</div>
+          <div class="setting-sub">Card Catalog (light) or Night Read (dark)</div>
+        </div>
+        <div class="icon-btn" id="theme-btn">&#9789; Dark</div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Auto scroll</div>
+          <div class="setting-sub">Advance to the next card every 8 seconds</div>
+        </div>
+        <div class="icon-btn" id="auto-btn">Off</div>
+      </div>
+      <div class="drawer-close" id="drawer-close">Close</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CATEGORIES = [
+  { id: 'random',       label: 'Random',        mode: 'random' },
+  { id: 'science',      label: 'Science',       mode: 'search', query: 'science discovery' },
+  { id: 'history',      label: 'History',       mode: 'search', query: 'history event' },
+  { id: 'space',        label: 'Space',         mode: 'search', query: 'astronomy space' },
+  { id: 'nature',       label: 'Nature',        mode: 'search', query: 'wildlife nature species' },
+  { id: 'tech',         label: 'Technology',    mode: 'search', query: 'technology invention' },
+  { id: 'art',          label: 'Art',           mode: 'search', query: 'art painting artist' },
+  { id: 'myth',         label: 'Mythology',     mode: 'search', query: 'mythology folklore legend' },
+  { id: 'food',         label: 'Food',          mode: 'search', query: 'cuisine food dish' },
+  { id: 'psychology',   label: 'Psychology',    mode: 'search', query: 'psychology human behavior' },
+  { id: 'architecture', label: 'Architecture',  mode: 'search', query: 'architecture building design' },
+  { id: 'ocean',        label: 'Ocean',         mode: 'search', query: 'ocean marine sea creature' },
+];
+
+const appEl = document.getElementById('app');
+const feedEl = document.getElementById('feed');
+const chipsEl = document.getElementById('chips');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsDrawer = document.getElementById('settings-drawer');
+const drawerClose = document.getElementById('drawer-close');
+const themeBtn = document.getElementById('theme-btn');
+const autoBtn = document.getElementById('auto-btn');
+const searchBtn = document.getElementById('search-btn');
+const searchRow = document.getElementById('search-row');
+const searchInput = document.getElementById('search-input');
+
+let activeCategory = CATEGORIES[0];
+let currentTheme = 'catalog';
+let cardCount = 0;
+let queue = [];
+let seenTitles = new Set();
+let fetchingPromise = null;
+let requestId = 0;
+let activeCardIndex = 0;
+let autoScrollOn = false;
+let autoScrollTimer = null;
+
+// ---- chips ----
+CATEGORIES.forEach(cat => {
+  const chip = document.createElement('div');
+  chip.className = 'chip' + (cat.id === activeCategory.id ? ' active' : '');
+  chip.textContent = cat.label;
+  chip.dataset.id = cat.id;
+  chip.addEventListener('click', () => switchCategory(cat));
+  chipsEl.appendChild(chip);
+});
+
+function switchCategory(cat){
+  activeCategory = cat;
+  [...chipsEl.children].forEach(c => c.classList.toggle('active', c.dataset.id === cat.id));
+  resetFeedState();
+  loadCards(3);
+}
+
+function runCustomSearch(term){
+  term = term.trim();
+  if (!term) return;
+  const cat = { id: 'custom', label: term.length > 16 ? term.slice(0,16) + '…' : term, mode: 'search', query: term };
+  activeCategory = cat;
+  [...chipsEl.children].forEach(c => c.classList.remove('active'));
+  resetFeedState();
+  loadCards(3);
+}
+
+searchBtn.addEventListener('click', () => {
+  searchRow.classList.toggle('open');
+  if (searchRow.classList.contains('open')) searchInput.focus();
+});
+searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runCustomSearch(searchInput.value); });
+
+// ---- settings tab ----
+settingsBtn.addEventListener('click', () => settingsDrawer.classList.add('open'));
+drawerClose.addEventListener('click', () => settingsDrawer.classList.remove('open'));
+settingsDrawer.addEventListener('click', (e) => { if (e.target === settingsDrawer) settingsDrawer.classList.remove('open'); });
+
+themeBtn.addEventListener('click', () => {
+  currentTheme = currentTheme === 'catalog' ? 'night' : 'catalog';
+  themeBtn.innerHTML = currentTheme === 'night' ? '&#9728; Light' : '&#9789; Dark';
+  appEl.className = 'theme-' + currentTheme;
+});
+
+autoBtn.addEventListener('click', () => {
+  autoScrollOn = !autoScrollOn;
+  autoBtn.classList.toggle('active', autoScrollOn);
+  autoBtn.textContent = autoScrollOn ? 'On' : 'Off';
+  if (autoScrollOn) scheduleAutoAdvance(8000);
+  else clearTimeout(autoScrollTimer);
+});
+
+// ---- auto scroll ----
+function scheduleAutoAdvance(delay){
+  clearTimeout(autoScrollTimer);
+  if (!autoScrollOn) return;
+  autoScrollTimer = setTimeout(advanceCard, delay);
+}
+function currentCardEl(){ return [...feedEl.children].find(c => parseInt(c.dataset.idx, 10) === activeCardIndex); }
+async function advanceCard(){
+  if (!autoScrollOn) return;
+  const currentEl = currentCardEl();
+  let nextEl = currentEl ? currentEl.nextElementSibling : feedEl.firstElementChild;
+  if (!nextEl) { await loadCards(2); nextEl = currentEl ? currentEl.nextElementSibling : feedEl.firstElementChild; }
+  if (nextEl) nextEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---- active-card detection (drives auto scroll timing) ----
+const cardObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+      const idx = parseInt(entry.target.dataset.idx, 10);
+      if (idx !== activeCardIndex) {
+        activeCardIndex = idx;
+        if (autoScrollOn) scheduleAutoAdvance(8000);
+      }
+    }
+  });
+}, { root: feedEl, threshold: [0.6] });
+
+// ---- data layer: prefetch queue ----
+async function fetchBatch(cat){
+  const base = 'https://en.wikipedia.org/w/api.php';
+  const common = 'prop=extracts|info|pageimages&piprop=thumbnail&pithumbsize=640&inprop=url&exintro=true&explaintext=true&exsentences=4';
+  let url;
+  if (cat.mode === 'random'){
+    url = `${base}?origin=*&action=query&format=json&generator=random&grnnamespace=0&grnlimit=12&${common}`;
+  } else {
+    const offset = Math.floor(Math.random() * 200);
+    url = `${base}?origin=*&action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(cat.query)}&gsrlimit=15&gsroffset=${offset}&gsrnamespace=0&${common}`;
+  }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const json = await res.json();
+    const pages = json.query && json.query.pages;
+    if (!pages) return [];
+    return Object.values(pages)
+      .filter(p => p.extract && p.extract.trim().length > 40)
+      .map(p => ({
+        title: p.title,
+        extract: p.extract.trim(),
+        url: p.fullurl || `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title)}`,
+        image: p.thumbnail ? p.thumbnail.source : null,
+        stampLabel: cat.label,
+      }));
+  } catch (e) { return []; }
+}
+
+async function ensureQueue(minSize){
+  if (queue.length >= minSize) return;
+  if (fetchingPromise) { await fetchingPromise; if (queue.length >= minSize) return; }
+  const myRequestId = requestId;
+  fetchingPromise = (async () => {
+    let attempts = 0;
+    while (queue.length < minSize && attempts < 4) {
+      attempts++;
+      const results = await Promise.all([fetchBatch(activeCategory), fetchBatch(activeCategory)]);
+      if (myRequestId !== requestId) return;
+      let added = 0;
+      results.flat().forEach(item => {
+        if (!seenTitles.has(item.title)) { seenTitles.add(item.title); queue.push(item); added++; }
+      });
+      if (added === 0) break;
+    }
+  })();
+  await fetchingPromise;
+  fetchingPromise = null;
+}
+
+function resetFeedState(){
+  requestId++;
+  queue = []; seenTitles = new Set(); cardCount = 0; feedEl.innerHTML = '';
+  activeCardIndex = 0;
+  clearTimeout(autoScrollTimer);
+}
+
+function escapeHtml(str){ const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
+function buildCardContent(card, data, index){
+  const mediaInner = data.image
+    ? `<img src="${data.image}" alt="${escapeHtml(data.title)}" loading="lazy">`
+    : `<div class="monogram">${escapeHtml(data.title.charAt(0).toUpperCase())}</div>`;
+  card.innerHTML = `
+    <div class="media">${mediaInner}</div>
+    <div class="content">
+      <div class="meta-row">
+        <div class="catalog-no">No. ${String(index).padStart(3,'0')}</div>
+        <div class="stamp">${escapeHtml(data.stampLabel)}</div>
+      </div>
+      <div class="fact-title">${escapeHtml(data.title)}</div>
+      <div class="fact-body">${escapeHtml(data.extract)}</div>
+      <div class="fact-source">
+        <a href="${data.url}" target="_blank" rel="noopener">Read the full article &#8599;</a>
+        <span>Wikipedia</span>
+      </div>
+    </div>
+  `;
+}
+
+function buildErrorContent(card, index){
+  card.classList.add('error-card');
+  card.innerHTML = `
+    <div class="media"><div class="monogram">!</div></div>
+    <div class="content">
+      <div class="meta-row"><div class="catalog-no">No. ${String(index).padStart(3,'0')}</div></div>
+      <div class="fact-title">Couldn't reach Wikipedia</div>
+      <div class="fact-body">The connection dropped. Scroll away and back, or try another topic.</div>
+    </div>
+  `;
+}
+
+async function loadCards(n){
+  await ensureQueue(n);
+  const myRequestId = requestId;
+  for (let i = 0; i < n; i++){
+    if (myRequestId !== requestId) return;
+    cardCount++;
+    const idx = cardCount;
+    const data = queue.shift();
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.idx = idx;
+    if (data) buildCardContent(card, data, idx); else buildErrorContent(card, idx);
+    feedEl.appendChild(card);
+    cardObserver.observe(card);
+  }
+  ensureQueue(8);
+}
+
+feedEl.addEventListener('scroll', () => {
+  const nearBottom = feedEl.scrollTop + feedEl.clientHeight > feedEl.scrollHeight - 900;
+  if (nearBottom) loadCards(2);
+});
+
+loadCards(3);
+</script>
+</body>
+</html>
